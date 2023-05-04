@@ -69,3 +69,6 @@ class TestAgent(unittest.TestCase):
         executor = Executor(name = 'pwsh', platform = 'windows',command='whoami')
         ability = Ability(ability_id='123', executors=[executor], privilege='User')
         asyncio.run(run_test(ability, executor))
+    
+    def test(self):
+        pass
