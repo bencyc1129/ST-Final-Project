@@ -6,7 +6,7 @@ from app.objects.c_ability import Ability
 from app.objects.secondclass.c_executor import Executor
 
 class TestAgent(unittest.TestCase):
-    agent = Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows',upstream_dest='http://127.0.0.1:9000')
+    agent = Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows')
 
     def test_is_global_variable(self):
         self.assertTrue(self.agent.is_global_variable('payload:whoami'))
@@ -15,7 +15,7 @@ class TestAgent(unittest.TestCase):
         self.assertFalse(self.agent.is_global_variable('client'))
     
     def test_upstream_dest(self):
-        self.assertEqual(self.agent.upstream_dest, 'http://127.0.0.1:9000')
+        self.assertEqual(Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows',upstream_dest='http://127.0.0.1:9000').upstream_dest, 'http://127.0.0.1:9000')
     
     def test_calculate_sleep(self):
         async def run_test():
@@ -70,5 +70,29 @@ class TestAgent(unittest.TestCase):
         ability = Ability(ability_id='123', executors=[executor], privilege='User')
         asyncio.run(run_test(ability, executor))
     
-    def test(self):
-        pass
+    # lack mock datetime
+    def test_heartbeat_modification(self):
+        async def run_test(**updated):
+            await self.agent.heartbeat_modification(**updated)
+            for modattr, expected in updated.items():
+                self.assertEqual(getattr(self.agent,modattr), expected)
+        asyncio.run(run_test(pid='1001',ppid='1002',server='192.168.1.1',exe_name='sandcat.go-windows.exe',
+                            location='C:\\Users\\Public\\sandcat.go-windows.exe', privilege='Evlavated',host='Victim',
+                            username='VICTIM\\Administrator',platform='linux',architecture='x86_64',proxy_receivers={"p1":["192.168.1.2"]},
+                            proxy_chain=[["192.168.1.3"]],deadman_enabled=True,contact='HTTP',host_ip_addrs='127.0.0.1',
+                            upstream_dest='http://127.0.0.1:9001',executors=['pwsh', 'psh','sh']))
+    
+    def test_gui_modification(self):
+        async def run_test(**updated):
+            await self.agent.gui_modification(**updated)
+            for modattr, expected in updated.items():
+                self.assertEqual(getattr(self.agent,modattr), expected)
+        asyncio.run(run_test(group='red', trusted=True, sleep_min=10, sleep_max=15, watchdog=1, pending_contact='DNS'))
+
+    def test_kill(self):
+        async def run_test():
+            await self.agent.kill()
+            self.assertEqual(self.agent.watchdog,1)
+            self.assertEqual(self.agent.sleep_max,60*2)
+            self.assertEqual(self.agent.sleep_min,60*2)
+        asyncio.run(run_test())
