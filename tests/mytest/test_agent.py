@@ -1,5 +1,7 @@
 import unittest
+from unittest.mock import patch
 import asyncio
+import datetime
 
 from app.objects.c_agent import Agent
 from app.objects.c_ability import Ability
@@ -70,8 +72,14 @@ class TestAgent(unittest.TestCase):
         ability = Ability(ability_id='123', executors=[executor], privilege='User')
         asyncio.run(run_test(ability, executor))
     
-    # lack mock datetime
     def test_heartbeat_modification(self):
+        @patch("datetime.datetime")
+        async def run_time_test(mock_datetime):
+            mock_datetime.utcnow.return_value = datetime.datetime(2020, 1, 1, 0, 0, 0)
+            self.agent.trusted = True
+            await self.agent.heartbeat_modification()
+            self.assertEqual(self.agent.last_seen, '2020-01-01 00:00:00')
+        
         async def run_test(**updated):
             await self.agent.heartbeat_modification(**updated)
             for modattr, expected in updated.items():
