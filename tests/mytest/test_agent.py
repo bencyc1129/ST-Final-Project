@@ -2,10 +2,13 @@ import unittest
 from unittest.mock import patch
 import asyncio
 import datetime
+import logging
 
 from app.objects.c_agent import Agent
 from app.objects.c_ability import Ability
 from app.objects.secondclass.c_executor import Executor
+from app.service.file_svc import FileSvc
+from app.service.data_svc import DataService
 
 class TestAgent(unittest.TestCase):
     agent = Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows')
@@ -104,3 +107,45 @@ class TestAgent(unittest.TestCase):
             self.assertEqual(self.agent.sleep_max,60*2)
             self.assertEqual(self.agent.sleep_min,60*2)
         asyncio.run(run_test())
+    
+    def test_error_log(self):
+        with self.assertLogs(level='ERROR') as captured:
+            self.agent.set_pending_executor_removal(3)
+            self.assertEqual(len(captured.records), 1) # check that there is only one log message
+        with self.assertLogs(level='ERROR') as captured:
+            self.agent.set_pending_executor_path_update("my new name", 0xdeafbeef)
+            self.assertEqual(len(captured.records), 1) # check that there is only one log message
+
+    @patch('app.service.file_svc.FileSvc.get_payload_name_from_uuid')
+    @patch('app.service.file_svc.FileSvc.__init__')
+    def test_replace(self, mock_init, mock_uuid):
+        mock_init.return_value = None
+        mock_uuid.return_value = 'keylogger', 'keylogger'
+        svc = FileSvc()
+        # echo #{location}
+        self.assertEqual(self.agent.replace(b'ZWNobyAje2xvY2F0aW9ufQ==', svc), "echo C:\\Users\\Public\\sandcat.go-windows.exe")
+        # ping #{server}
+        self.assertEqual(self.agent.replace(b'cGluZyAje3NlcnZlcn0=', svc), "ping 192.168.1.1")
+        # some word
+        # with
+        # multi line
+        # exe name: #{exe_name}
+        self.assertEqual(self.agent.replace(b'c29tZSB3b3JkCndpdGgKbXVsdGkgbGluZQpleGUgbmFtZTogI3tleGVfbmFtZX0=', svc), "some wordwithmulti lineexe name: sandcat.go-windows.exe")
+        
+        #./#{payload:b6aab2a6-67c9-44ee-99d4-e4091ab3ad39}
+        self.assertEqual(self.agent.replace(b'Li8je3BheWxvYWQ6YjZhYWIyYTYtNjdjOS00NGVlLTk5ZDQtZTQwOTFhYjNhZDM5fQ==', svc), "./keylogger")
+    
+    @patch('app.service.data_svc.DataService.locate')
+    @patch('app.objects.c_agent.Agent.task')
+    def test_bootstrap(self, mock_task, mock_locate):
+        svc = DataService()
+        mock_locate.return_value = [Ability(ability_id='36eecb80-ede3-442b-8774-956e906aff02', executors=[Executor(name='sh', platform='linux', command='whoami')], privilege='User')]
+        mock_task.return_value = None
+        self.agent.apply_config(name='agents', config={})
+        self.agent.set_config(name='agents', prop='bootstrap_abilities', value=['36eecb80-ede3-442b-8774-956e906aff02'])
+        async def run_test(svc):
+            await self.agent.bootstrap(svc)
+        asyncio.run(run_test(svc))
+    
+    def test_all_facts(self):
+        self.assertEqual(self.agent.all_facts(), '')
