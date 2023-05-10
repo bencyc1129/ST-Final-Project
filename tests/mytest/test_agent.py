@@ -9,6 +9,12 @@ from app.objects.c_ability import Ability
 from app.objects.secondclass.c_executor import Executor
 from app.service.file_svc import FileSvc
 from app.service.data_svc import DataService
+from app.service.knowledge_svc import KnowledgeService
+from app.service.event_svc import EventService
+from app.service.contact_svc import ContactService
+from app.utility.base_service import BaseService
+from app.utility.base_world import BaseWorld
+from app.objects.secondclass.c_fact import Fact
 
 class TestAgent(unittest.TestCase):
     agent = Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows')
@@ -147,5 +153,49 @@ class TestAgent(unittest.TestCase):
             await self.agent.bootstrap(svc)
         asyncio.run(run_test(svc))
     
-    def test_all_facts(self):
-        self.assertEqual(self.agent.all_facts(), '')
+    @patch('app.service.event_svc.EventService.fire_event')
+    def test_all_facts(self, mock_fire_event):
+        app_config = self.app_config()
+        BaseWorld.apply_config(name='main', config=app_config)
+        baseService = BaseService()
+        knowledge_svc = KnowledgeService()
+        cotact_svc = ContactService()
+        baseService.add_service('contact_svc', cotact_svc)
+        event_svc = EventService()
+        baseService.add_service('knowledge_svc', knowledge_svc)
+        fact = [Fact(trait='host.user.name', value='test', score=1, collected_by='123', technique_id='123', source='123'),
+                Fact(trait='192.168.0.1', value='test2', score=1, collected_by='123', technique_id='123', source='456'),
+                Fact(trait='C:/Windows/Temp', value='test3', score=1, collected_by='123', technique_id='123', source='123')]
+        mock_fire_event.return_value = None
+        async def run_test():
+            for i in range(len(fact)):
+                await knowledge_svc.add_fact(fact[i])
+            result = await self.agent.all_facts()
+            self.assertEqual(len(result), 2)
+        asyncio.run(run_test())
+    
+    def app_config(self):
+        return {
+        'app.contact.dns.domain': 'mycaldera.caldera',
+        'app.contact.dns.socket': '0.0.0.0:8853',
+        'app.contact.html': '/weather',
+        'app.contact.http': '0.0.0.0:8888',
+        'app.contact.tcp': '0.0.0.0:7010',
+        'app.contact.tunnel.ssh.socket': '0.0.0.0:8022',
+        'app.contact.udp': '0.0.0.0:7013',
+        'app.contact.websocket': '0.0.0.0:7012',
+        'plugins': [
+            'stockpile',
+            'atomic'
+        ],
+        'host': '0.0.0.0',
+        'auth.login.handler.module': 'default',
+        'users': {
+            'red': {
+                'red': 'password-foo'
+            },
+            'blue': {
+                'blue': 'password-bar'
+            }
+        }
+    }
