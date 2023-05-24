@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 import asyncio
-import datetime
+from datetime import datetime, timezone
 import logging
 
 from app.objects.c_agent import Agent
@@ -81,18 +81,29 @@ class TestAgent(unittest.TestCase):
         ability = Ability(ability_id='123', executors=[executor], privilege='User')
         asyncio.run(run_test(ability, executor))
     
-    def test_heartbeat_modification(self):
-        @patch("datetime.datetime")
-        async def run_time_test(mock_datetime):
-            mock_datetime.utcnow.return_value = datetime.datetime(2020, 1, 1, 0, 0, 0)
-            self.agent.trusted = True
+    def test_heartbeat_modification(self):           
+        async def run_time_test():       
             await self.agent.heartbeat_modification()
-            self.assertEqual(self.agent.last_seen, '2020-01-01 00:00:00')
-        
+            if self.agent.trusted:
+                self.assertEqual(self.agent.last_trusted_seen, datetime.now(timezone.utc))
+            else:            
+                self.assertEqual(self.agent.last_trusted_seen,self.agent.created)
+        self.agent.trusted = False
+        asyncio.run(run_time_test())
+        self.agent.trusted = True
+        asyncio.run(run_time_test())
+
+        async def run_executor_not_change_test():  
+            await self.agent.heartbeat_modification()
+            self.assertEqual(getattr(self.agent,'executors'), ['pwsh', 'psh'])
+        self.agent._executor_change_to_assign = dict(action='update_path', executor='sh',value='bin/sh')
+        asyncio.run(run_executor_not_change_test())
+
         async def run_test(**updated):
             await self.agent.heartbeat_modification(**updated)
             for modattr, expected in updated.items():
                 self.assertEqual(getattr(self.agent,modattr), expected)
+        self.agent._executor_change_to_assign = None
         asyncio.run(run_test(pid='1001',ppid='1002',server='192.168.1.1',exe_name='sandcat.go-windows.exe',
                             location='C:\\Users\\Public\\sandcat.go-windows.exe', privilege='Evlavated',host='Victim',
                             username='VICTIM\\Administrator',platform='linux',architecture='x86_64',proxy_receivers={"p1":["192.168.1.2"]},

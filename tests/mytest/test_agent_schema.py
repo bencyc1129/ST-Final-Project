@@ -7,11 +7,15 @@ class TestAgentFieldsSchema(unittest.TestCase):
 
     def test_remove_nulls(self):
         ser_agent = self.agent.schema.dump(self.agent)
-        ser_agent['Test'] = None
-        self.assertIn('Test',ser_agent.keys())
-        self.assertIsNone(ser_agent['Test'])
+        ser_agent['TestNone'] = None
+        ser_agent['TestExist'] = "abc"
+        self.assertIn('TestNone',ser_agent.keys())
+        self.assertIsNone(ser_agent['TestNone'])
+        self.assertIn('TestExist',ser_agent.keys())
+        self.assertIsNotNone('TestExist',ser_agent.keys())
         removed = self.agent.schema.remove_nulls(ser_agent)
-        self.assertNotIn('Test',removed.keys())
+        self.assertNotIn('TestNone',removed.keys())
+        self.assertIn('TestExist',removed.keys())
 
     def test_remove_properties(self):
         ser_agent = self.agent.schema.dump(self.agent)
