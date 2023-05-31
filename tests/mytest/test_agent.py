@@ -125,13 +125,53 @@ class TestAgent(unittest.TestCase):
             self.assertEqual(self.agent.sleep_min,60*2)
         asyncio.run(run_test())
     
-    def test_error_log(self):
+    
+    def test_set_pending_executor_removal(self):
+        # True, True
+        t_agent = Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows', privilege='User')
+        t_agent.set_pending_executor_removal('psh')
+        self.assertEqual(t_agent.executors, ['pwsh'])
+
+        # True, False
         with self.assertLogs(level='ERROR') as captured:
             self.agent.set_pending_executor_removal(3)
             self.assertEqual(len(captured.records), 1) # check that there is only one log message
+        
+        # False, False
         with self.assertLogs(level='ERROR') as captured:
-            self.agent.set_pending_executor_path_update("my new name", 0xdeafbeef)
+            self.agent.set_pending_executor_removal(None)
             self.assertEqual(len(captured.records), 1) # check that there is only one log message
+    
+    def test_set_pending_executor_path_update(self):
+        t_agent = Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows', privilege='User')
+        # True, True, True, True
+        t_agent.set_pending_executor_path_update('pwsh', '/usr/bin/pwsh')
+        self.assertEqual(t_agent._executor_change_to_assign, dict(action='update_path', executor='pwsh',
+                                                       value='/usr/bin/pwsh'))
+        # True, True, True, False
+        with self.assertLogs(level='ERROR') as captured:
+            t_agent.set_pending_executor_path_update('pwsh', 0xdeadbeef)
+            self.assertEqual(len(captured.records), 1)
+        # True, True, False, True
+        with self.assertLogs(level='ERROR') as captured:
+            t_agent.set_pending_executor_path_update(0xdeadbeef, '/usr/bin/pwsh')
+            self.assertEqual(len(captured.records), 1)
+        # True, False, True, False
+        with self.assertLogs(level='ERROR') as captured:
+            t_agent.set_pending_executor_path_update('pwsh', None)
+            self.assertEqual(len(captured.records), 1)
+        # False, True, False, True
+        with self.assertLogs(level='ERROR') as captured:
+            t_agent.set_pending_executor_path_update(None, '/usr/bin/pwsh')
+            self.assertEqual(len(captured.records), 1)
+        # True, True, False, False
+        with self.assertLogs(level='ERROR') as captured:
+            t_agent.set_pending_executor_path_update(123, ['a', 'b', 'c'])
+            self.assertEqual(len(captured.records), 1)
+        # False, False, False, False
+        with self.assertLogs(level='ERROR') as captured:
+            t_agent.set_pending_executor_path_update(None, None)
+            self.assertEqual(len(captured.records), 1)
 
     @patch('app.service.file_svc.FileSvc.get_payload_name_from_uuid')
     @patch('app.service.file_svc.FileSvc.__init__')
@@ -152,6 +192,26 @@ class TestAgent(unittest.TestCase):
         #./#{payload:b6aab2a6-67c9-44ee-99d4-e4091ab3ad39}
         self.assertEqual(self.agent.replace(b'Li8je3BheWxvYWQ6YjZhYWIyYTYtNjdjOS00NGVlLTk5ZDQtZTQwOTFhYjNhZDM5fQ==', svc), "./keylogger")
     
+    def test_privileged_to_run(self):
+        # executor = Executor(name='psh', platform='windows', command='whoami')
+        # ability = Ability(ability_id='123', executors=[executor], privilege='Elevated')
+
+        # False, False
+        t_agent = Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows', privilege='User')
+        executor = Executor(name='psh', platform='windows', command='whoami')
+        ability = Ability(ability_id='123', executors=[executor], privilege='Elevated')
+        self.assertFalse(t_agent.privileged_to_run(ability))
+
+        # False, True
+        t_agent = Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows', privilege='Elevated')
+        ability = Ability(ability_id='123', executors=[executor], privilege='User')
+        self.assertTrue(t_agent.privileged_to_run(ability))
+
+        # True, True & True, False
+        # Can't test this because of the way the function is written
+
+        
+
     @patch('app.service.data_svc.DataService.locate')
     @patch('app.objects.c_agent.Agent.task')
     def test_bootstrap(self, mock_task, mock_locate):
