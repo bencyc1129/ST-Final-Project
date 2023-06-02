@@ -13,17 +13,30 @@ class TestAgent(unittest.TestCase):
     '''Test deadman function
     - by mocking task function, we can test line 250-256
     '''
-    @patch('app.service.data_svc.DataService.locate')
     @patch('app.objects.c_agent.Agent.task')
-    def test_deadman(self, mock_task, mock_locate):
+    def test_deadman_F(self, mock_task):
         async def run_test(data_svc):
             await self.agent.deadman(data_svc=data_svc)
         
         data_svc = DataService()
+        mock_task.return_value = []
+
+        # when deadman_abilities is None
+        self.assertEqual([], asyncio.run(run_test(data_svc)))
+    
+    @patch('app.service.data_svc.DataService.locate')
+    @patch('app.objects.c_agent.Agent.task')
+    def test_deadman_T(self, mock_task, mock_locate):
+        async def run_test(data_svc):
+            await self.agent.deadman(data_svc=data_svc)
+        
+        data_svc = DataService()
+        mock_task.return_value = []
         mock_locate.return_value = [Ability(ability_id='36eecb80-ede3-442b-8774-956e906aff02', executors=[Executor(name='psh', platform='windows', command='whoami')], privilege='User')]
-        mock_task.return_value = None
+
+        # when deadman_abilities is not None
         self.agent.set_config(name='agents', prop='deadman_abilities', value=['36eecb80-ede3-442b-8774-956e906aff02'])
-        asyncio.run(run_test(data_svc))
+        self.assertEqual([], asyncio.run(run_test(data_svc)))
 
     '''Test task function
     - when Agent.executors is [] : line 259-260
@@ -34,8 +47,9 @@ class TestAgent(unittest.TestCase):
     - when executor is not psh or sh : line 346
     '''
     @patch('app.service.knowledge_svc.KnowledgeService.add_fact')
+    @patch('app.utility.base_planning_svc.BasePlanningService.add_test_variants')
     @patch('app.utility.base_planning_svc.BasePlanningService.obfuscate_commands')
-    def test_task(self, mock_obfuscate_commands, mock_add_fact):
+    def test_task(self, mock_obfuscate_commands, mock_add_test_variants, mock_add_fact):
         async def run_test(abilities, obfuscator, facts=(), deadman=False):
             links = await self.agent.task(abilities=abilities, obfuscator=obfuscator, facts=facts, deadman=deadman)
             return links
@@ -44,6 +58,7 @@ class TestAgent(unittest.TestCase):
         mock_obfuscate_commands.return_value = []
         self.assertEqual([], asyncio.run(run_test(abilities=[], obfuscator='plain-text', facts=(), deadman=False)))
 
+        # When valid_links is not None
         self.agent.platform = 'windows'
         self.agent.executors = ['psh']
         mock_obfuscate_commands.return_value = []
@@ -53,6 +68,7 @@ class TestAgent(unittest.TestCase):
                              facts=[Fact(trait='host.user.name', value='test', score=1, collected_by='123', technique_id='123', source='123')],
                              deadman=False)))
         
+        # When valid_links is None
         self.agent.platform = 'linux'
         self.agent.executors = ['sh']
         self.assertEqual([], asyncio.run(run_test(abilities=[], obfuscator='plain-text', facts=(), deadman=False)))
