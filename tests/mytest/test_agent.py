@@ -193,9 +193,6 @@ class TestAgent(unittest.TestCase):
         self.assertEqual(self.agent.replace(b'Li8je3BheWxvYWQ6YjZhYWIyYTYtNjdjOS00NGVlLTk5ZDQtZTQwOTFhYjNhZDM5fQ==', svc), "./keylogger")
     
     def test_privileged_to_run(self):
-        # executor = Executor(name='psh', platform='windows', command='whoami')
-        # ability = Ability(ability_id='123', executors=[executor], privilege='Elevated')
-
         # False, False
         t_agent = Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows', privilege='User')
         executor = Executor(name='psh', platform='windows', command='whoami')
@@ -204,11 +201,14 @@ class TestAgent(unittest.TestCase):
 
         # False, True
         t_agent = Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows', privilege='Elevated')
+        ability = Ability(ability_id='123', executors=[executor], privilege='Elevated')
+        self.assertTrue(t_agent.privileged_to_run(ability))
+
+        # True, True
+        t_agent = Agent(paw='123', sleep_min=2, sleep_max=8, watchdog=0, executors=['pwsh', 'psh'], platform='windows', privilege='User')
         ability = Ability(ability_id='123', executors=[executor], privilege='User')
         self.assertTrue(t_agent.privileged_to_run(ability))
 
-        # True, True & True, False
-        # Can't test this because of the way the function is written
 
         
 
