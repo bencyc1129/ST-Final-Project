@@ -172,6 +172,14 @@ class TestAgent(unittest.TestCase):
         with self.assertLogs(level='ERROR') as captured:
             t_agent.set_pending_executor_path_update(None, None)
             self.assertEqual(len(captured.records), 1)
+        # True, False, Flase, False
+        with self.assertLogs(level='ERROR') as captured:
+            t_agent.set_pending_executor_path_update(3, None)
+            self.assertEqual(len(captured.records), 1)
+        # False, True, Flase, False
+        with self.assertLogs(level='ERROR') as captured:
+            t_agent.set_pending_executor_path_update(None, 3)
+            self.assertEqual(len(captured.records), 1)
 
     @patch('app.service.file_svc.FileSvc.get_payload_name_from_uuid')
     @patch('app.service.file_svc.FileSvc.__init__')
